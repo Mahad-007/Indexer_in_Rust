@@ -2,56 +2,55 @@ use std::{env, time::Duration};
 
 use error::AppError;
 use indexer_db::{entity::evm_chains::EvmChains, initialize_database};
-use service::ListenerService;
-use tokio::task::JoinSet;
-use tower::{Service, ServiceBuilder, ServiceExt};
+use service::{fetch_and_save_logs, FilterMode};
+use tokio::time::sleep;
 
 mod error;
 mod service;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let db_pool = initialize_database().await.unwrap();
+    println!("Starting BeanBee BSC Indexer...");
+    
+    let db_pool = initialize_database().await?;
+    
     let chain_id_env =
         env::var("CHAIN_ID").map_err(|_| AppError::MissingEnvVar("CHAIN_ID".into()))?;
     let chain_id = chain_id_env
         .parse::<u64>()
         .map_err(|_| AppError::InvalidChainID(chain_id_env))?;
-    let contract_addresses = env::var("CONTRACT_ADDRESSES")
-        .map_err(|_| AppError::MissingEnvVar("CONTRACT_ADDRESSES".into()))?;
-
-    let addresses = contract_addresses.split(",");
 
     let evm_chain = EvmChains::fetch_by_id(chain_id, &db_pool).await?;
+    println!("Connected to chain: {} (ID: {})", evm_chain.name, chain_id);
 
-    let mut service_futures = JoinSet::new();
+    // Get event topics from environment
+    let topic_pair_created = env::var("TOPIC_PAIR_CREATED")
+        .unwrap_or_else(|_| "0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9".to_string());
+    
+    // PancakeSwap V2 Factory address for PairCreated events
+    let pancake_factory = env::var("PANCAKE_FACTORY")
+        .unwrap_or_else(|_| "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73".to_string());
 
-    for address in addresses {
-        let mut service = ServiceBuilder::new()
-            .rate_limit(1, Duration::from_secs(evm_chain.block_time as u64))
-            .service(ListenerService {
-                chain_id,
-                address: address.into(),
-                db_pool: db_pool.clone(),
-            });
+    // For MVP with public RPC: Only index PairCreated events (address-filtered)
+    // Swap and Transfer require a paid RPC due to volume
+    let filter = FilterMode::ByAddressAndTopic {
+        address: pancake_factory,
+        topic: topic_pair_created,
+        name: "PairCreated".to_string(),
+    };
 
-        let future = async move {
-            loop {
-                if service.ready().await.is_ok() {
-                    match service.call(()).await {
-                        Ok(()) => {}
-                        Err(err) => {
-                            eprintln!("Failed to indexed: {:?}", err);
-                        }
-                    }
-                }
+    let poll_delay = Duration::from_secs(evm_chain.block_time as u64);
+
+    println!("Indexing PairCreated events from PancakeSwap V2 Factory...");
+    println!("Note: Swap/Transfer events require a paid RPC due to volume.");
+
+    loop {
+        match fetch_and_save_logs(chain_id, db_pool.clone(), filter.clone()).await {
+            Ok(()) => {}
+            Err(err) => {
+                eprintln!("Indexing error: {:?}", err);
             }
-        };
-
-        service_futures.spawn(future);
+        }
+        sleep(poll_delay).await;
     }
-
-    service_futures.join_all().await;
-
-    Ok(())
 }

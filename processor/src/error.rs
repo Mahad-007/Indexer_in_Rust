@@ -35,4 +35,16 @@ pub enum AppError {
         #[source]
         source: EvmLogsError,
     },
+
+    #[error("Redis connection error: {0}")]
+    RedisConnection(String),
+
+    #[error("Redis publish error: {0}")]
+    RedisPublish(String),
+
+    #[error("Event decoding error: {0}")]
+    EventDecode(String),
+
+    #[error("Unknown event topic: {0}")]
+    UnknownEventTopic(String),
 }
