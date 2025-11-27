@@ -47,4 +47,10 @@ pub enum AppError {
 
     #[error("Unknown event topic: {0}")]
     UnknownEventTopic(String),
+
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+
+    #[error("Handler error: {0}")]
+    Handler(String),
 }

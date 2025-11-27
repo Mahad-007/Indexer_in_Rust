@@ -7,13 +7,19 @@ use tokio::time::{sleep, Duration};
 mod contracts;
 mod error;
 mod events;
+pub mod handlers;
 mod redis_client;
+pub mod scoring;
 mod service;
 mod utils;
 
 mod defaults {
     pub const POLL_INTERVAL: &str = "10";
     pub const BATCH_SIZE: &str = "25";
+    pub const BNB_PRICE_USD: &str = "600";
+    pub const WHALE_THRESHOLD_USD: &str = "5000";
+    pub const WBNB_ADDRESS: &str = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
+    pub const BUSD_ADDRESS: &str = "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56";
 }
 
 #[tokio::main]

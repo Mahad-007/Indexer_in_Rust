@@ -4,10 +4,17 @@ use sqlx::{types::chrono, Executor, Postgres};
 pub struct EvmChains {
     pub id: i64,
     pub name: String,
-    pub last_synced_block_number: i64,
+    pub last_synced_block_number: Option<i64>,
     pub block_time: i32,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
+}
+
+impl EvmChains {
+    /// Get last synced block number, defaulting to 0 if not set
+    pub fn get_last_synced_block(&self) -> i64 {
+        self.last_synced_block_number.unwrap_or(0)
+    }
 }
 
 impl EvmChains {

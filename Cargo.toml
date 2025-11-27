@@ -4,7 +4,8 @@ resolver = "2"
 members = [
 	"libs/indexer-db",
 	"listener",
-	"processor"
+	"processor",
+	"api"
 ]
 
 [workspace.dependencies]

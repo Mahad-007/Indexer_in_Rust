@@ -6,6 +6,7 @@ edition = '2021'
 
 [dependencies]
 alloy = { workspace = true }
+chrono = { version = "0.4", features = ["serde"] }
 indexer-db = { path = '../libs/indexer-db', version = '0.0.10' }
 redis = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
