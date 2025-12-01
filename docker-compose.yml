@@ -60,6 +60,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: prod
+      args:
+        APP_NAME: listener
     environment:
       PGHOST: db
       PGPORT: 5432
@@ -72,7 +74,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["/app/listener"]
+    command: ["/usr/local/bin/app"]
     restart: unless-stopped
 
   # Processor service (business logic, dual-write to Postgres + Redis)
@@ -81,6 +83,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: prod
+      args:
+        APP_NAME: processor
     environment:
       PGHOST: db
       PGPORT: 5432
@@ -100,7 +104,7 @@ services:
         condition: service_healthy
       listener:
         condition: service_started
-    command: ["/app/processor"]
+    command: ["/usr/local/bin/app"]
     restart: unless-stopped
 
   # API service (REST endpoints for frontend)
@@ -109,6 +113,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: prod
+      args:
+        APP_NAME: api
     environment:
       PGHOST: db
       PGPORT: 5432
@@ -125,7 +131,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: ["/app/api"]
+    command: ["/usr/local/bin/app"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
