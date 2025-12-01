@@ -182,8 +182,77 @@ pub async fn handle(ctx: &HandlerContext, event: &SwapEvent) -> HandlerResult<()
     };
     let price_bnb_bd = BigDecimal::from_str(&format!("{:.18}", price_bnb)).unwrap_or(BigDecimal::from(0));
 
-    // We'd need reserves to calculate liquidity properly - for now skip
-    // This would come from Sync events
+    // Get previous token state for price comparison
+    let old_token = Token::find_by_address(&token_address, &ctx.db_pool).await?;
+
+    // Update price in DB
+    if let Err(e) = Token::update_price_metrics(
+        &token_address,
+        &price_usd_bd,
+        &price_bnb_bd,
+        &BigDecimal::from(0), // Liquidity TODO
+        &BigDecimal::from(0), // Liquidity BNB TODO
+        &ctx.db_pool,
+    ).await {
+        eprintln!("Failed to update token price: {}", e);
+    }
+
+    // Check for Price Pump/Dump
+    if let Some(token) = old_token {
+        if let Some(old_price) = token.price_usd {
+            let old_price_f64 = old_price.to_string().parse::<f64>().unwrap_or(0.0);
+            if old_price_f64 > 0.0 {
+                let price_change_percent = ((price_usd - old_price_f64) / old_price_f64) * 100.0;
+                
+                // Pump: > 50% increase
+                if price_change_percent > 50.0 {
+                     let alert = NewAlert {
+                        alert_type: AlertType::PricePump.as_str().to_string(),
+                        token_address: Some(token_address.clone()),
+                        token_symbol: token.symbol.clone(),
+                        wallet_address: None,
+                        title: format!("Price Pump: +{:.0}%", price_change_percent),
+                        message: Some(format!(
+                            "{} price pumped {:.0}% to ${:.10}",
+                            token.symbol.as_deref().unwrap_or("Token"),
+                            price_change_percent,
+                            price_usd
+                        )),
+                        bee_score: token.bee_score,
+                        amount_usd: None,
+                        change_percent: Some(BigDecimal::from_str(&format!("{:.2}", price_change_percent)).unwrap_or(BigDecimal::from(0))),
+                        metadata: None,
+                    };
+                    if let Err(e) = AlertEvent::create(&alert, &ctx.db_pool).await {
+                        eprintln!("Failed to create pump alert: {}", e);
+                    }
+                }
+                // Dump: > 50% decrease
+                else if price_change_percent < -50.0 {
+                     let alert = NewAlert {
+                        alert_type: AlertType::PriceDump.as_str().to_string(),
+                        token_address: Some(token_address.clone()),
+                        token_symbol: token.symbol.clone(),
+                        wallet_address: None,
+                        title: format!("Price Dump: {:.0}%", price_change_percent),
+                        message: Some(format!(
+                            "{} price dumped {:.0}% to ${:.10}",
+                            token.symbol.as_deref().unwrap_or("Token"),
+                            price_change_percent,
+                            price_usd
+                        )),
+                        bee_score: token.bee_score,
+                        amount_usd: None,
+                        change_percent: Some(BigDecimal::from_str(&format!("{:.2}", price_change_percent)).unwrap_or(BigDecimal::from(0))),
+                        metadata: None,
+                    };
+                    if let Err(e) = AlertEvent::create(&alert, &ctx.db_pool).await {
+                        eprintln!("Failed to create dump alert: {}", e);
+                    }
+                }
+            }
+        }
+    }
 
     // Create whale alert if applicable
     if is_whale {
