@@ -11,6 +11,7 @@ pub mod price_snapshot;
 pub mod swap;
 pub mod token;
 pub mod token_holder;
+pub mod wallet;
 pub mod wallet_activity;
 
 // Re-exports for convenience
@@ -25,4 +26,5 @@ pub use price_snapshot::PriceSnapshot;
 pub use swap::Swap;
 pub use token::Token;
 pub use token_holder::TokenHolder;
+pub use wallet::{Wallet, WalletWithStats};
 pub use wallet_activity::WalletActivity;

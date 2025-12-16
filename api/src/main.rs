@@ -127,6 +127,18 @@ async fn root() -> axum::response::Html<&'static str> {
 
     <h3>Wallets</h3>
     <div class="endpoint">
+        <span class="method">GET</span> <a href="/api/wallets">/api/wallets</a> - List tracked wallets
+    </div>
+    <div class="endpoint">
+        <span class="method">POST</span> <code>/api/wallets</code> - Add wallet to track
+    </div>
+    <div class="endpoint">
+        <span class="method">GET</span> <code>/api/wallets/:address</code> - Get wallet details
+    </div>
+    <div class="endpoint">
+        <span class="method">DELETE</span> <code>/api/wallets/:address</code> - Remove wallet
+    </div>
+    <div class="endpoint">
         <span class="method">GET</span> <code>/api/wallets/:address/activity</code> - Wallet activity
     </div>
 

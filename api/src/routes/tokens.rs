@@ -20,88 +20,110 @@ use indexer_db::entity::{
 
 use crate::AppState;
 
-/// Token list response item
+/// Helper to convert BigDecimal to f64
+fn bd_to_f64(bd: &sqlx::types::BigDecimal) -> f64 {
+    bd.to_string().parse().unwrap_or(0.0)
+}
+
+/// Token list response item - matches frontend Token interface
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TokenListItem {
     pub address: String,
-    pub name: Option<String>,
-    pub symbol: Option<String>,
-    pub price_usd: Option<String>,
-    pub price_change_1h: Option<String>,
-    pub liquidity_usd: Option<String>,
-    pub volume_1h_usd: Option<String>,
-    pub volume_24h_usd: Option<String>,
-    pub trades_1h: Option<i32>,
-    pub holder_count: Option<i32>,
-    pub bee_score: Option<i16>,
-    pub created_at: Option<String>,
+    pub name: String,
+    pub symbol: String,
+    pub price: f64,
+    pub price_change1h: f64,
+    pub price_change24h: f64,
+    pub liquidity: f64,
+    pub market_cap: f64,
+    pub volume1h: f64,
+    pub volume24h: f64,
+    pub holders: i32,
+    pub bee_score: i16,
+    pub safety_score: i16,
+    pub traction_score: i16,
+    pub lp_locked: bool,
+    pub dev_holdings: f64,
+    pub sniper_ratio: f64,
+    pub created_at: String,
+    pub chain: String,
 }
 
 impl From<Token> for TokenListItem {
     fn from(t: Token) -> Self {
         Self {
             address: t.address,
-            name: t.name,
-            symbol: t.symbol,
-            price_usd: t.price_usd.map(|v| v.to_string()),
-            price_change_1h: t.price_change_1h.map(|v| v.to_string()),
-            liquidity_usd: t.liquidity_usd.map(|v| v.to_string()),
-            volume_1h_usd: t.volume_1h_usd.map(|v| v.to_string()),
-            volume_24h_usd: t.volume_24h_usd.map(|v| v.to_string()),
-            trades_1h: t.trades_1h,
-            holder_count: t.holder_count,
-            bee_score: t.bee_score,
-            created_at: t.created_at.map(|dt| dt.to_rfc3339()),
+            name: t.name.unwrap_or_else(|| "Unknown".to_string()),
+            symbol: t.symbol.unwrap_or_else(|| "???".to_string()),
+            price: t.price_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            price_change1h: t.price_change_1h.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            price_change24h: t.price_change_24h.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            liquidity: t.liquidity_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            market_cap: t.market_cap_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            volume1h: t.volume_1h_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            volume24h: t.volume_24h_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            holders: t.holder_count.unwrap_or(0),
+            bee_score: t.bee_score.unwrap_or(0),
+            safety_score: t.safety_score.unwrap_or(0),
+            traction_score: t.traction_score.unwrap_or(0),
+            lp_locked: t.lp_locked.unwrap_or(false),
+            dev_holdings: t.dev_holdings_percent.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            sniper_ratio: t.sniper_ratio.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            created_at: t.created_at.map(|dt| dt.to_rfc3339()).unwrap_or_else(|| Utc::now().to_rfc3339()),
+            chain: "BSC".to_string(),
         }
     }
 }
 
-/// Token detail response
+/// Token detail response - extended version for single token view
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TokenDetail {
     pub address: String,
-    pub name: Option<String>,
-    pub symbol: Option<String>,
-    pub decimals: Option<i16>,
+    pub name: String,
+    pub symbol: String,
+    pub decimals: i16,
     pub pair_address: Option<String>,
     pub creator_address: Option<String>,
-    pub created_at: Option<String>,
+    pub created_at: String,
     pub block_number: Option<i64>,
 
     // Price metrics
-    pub price_usd: Option<String>,
-    pub price_bnb: Option<String>,
-    pub price_change_1h: Option<String>,
-    pub price_change_24h: Option<String>,
-    pub market_cap_usd: Option<String>,
-    pub liquidity_usd: Option<String>,
-    pub liquidity_bnb: Option<String>,
-    pub volume_1h_usd: Option<String>,
-    pub volume_24h_usd: Option<String>,
+    pub price: f64,
+    pub price_bnb: f64,
+    pub price_change1h: f64,
+    pub price_change24h: f64,
+    pub market_cap: f64,
+    pub liquidity: f64,
+    pub liquidity_bnb: f64,
+    pub volume1h: f64,
+    pub volume24h: f64,
 
     // Trading metrics
-    pub trades_1h: Option<i32>,
-    pub trades_24h: Option<i32>,
-    pub buys_1h: Option<i32>,
-    pub sells_1h: Option<i32>,
+    pub trades1h: i32,
+    pub trades24h: i32,
+    pub buys1h: i32,
+    pub sells1h: i32,
 
     // Holder metrics
-    pub holder_count: Option<i32>,
-    pub top_10_holder_percent: Option<String>,
-    pub dev_holdings_percent: Option<String>,
-    pub sniper_ratio: Option<String>,
+    pub holders: i32,
+    pub top10_holder_percent: f64,
+    pub dev_holdings: f64,
+    pub sniper_ratio: f64,
 
     // Safety
-    pub lp_locked: Option<bool>,
-    pub lp_lock_percent: Option<String>,
+    pub lp_locked: bool,
+    pub lp_lock_percent: f64,
     pub lp_unlock_date: Option<String>,
-    pub ownership_renounced: Option<bool>,
+    pub ownership_renounced: bool,
 
     // BeeScore
-    pub bee_score: Option<i16>,
-    pub safety_score: Option<i16>,
-    pub traction_score: Option<i16>,
+    pub bee_score: i16,
+    pub safety_score: i16,
+    pub traction_score: i16,
 
+    pub chain: String,
     pub last_updated: Option<String>,
 }
 
@@ -109,43 +131,44 @@ impl From<Token> for TokenDetail {
     fn from(t: Token) -> Self {
         Self {
             address: t.address,
-            name: t.name,
-            symbol: t.symbol,
-            decimals: t.decimals,
+            name: t.name.unwrap_or_else(|| "Unknown".to_string()),
+            symbol: t.symbol.unwrap_or_else(|| "???".to_string()),
+            decimals: t.decimals.unwrap_or(18),
             pair_address: t.pair_address,
             creator_address: t.creator_address,
-            created_at: t.created_at.map(|dt| dt.to_rfc3339()),
+            created_at: t.created_at.map(|dt| dt.to_rfc3339()).unwrap_or_else(|| Utc::now().to_rfc3339()),
             block_number: t.block_number,
 
-            price_usd: t.price_usd.map(|v| v.to_string()),
-            price_bnb: t.price_bnb.map(|v| v.to_string()),
-            price_change_1h: t.price_change_1h.map(|v| v.to_string()),
-            price_change_24h: t.price_change_24h.map(|v| v.to_string()),
-            market_cap_usd: t.market_cap_usd.map(|v| v.to_string()),
-            liquidity_usd: t.liquidity_usd.map(|v| v.to_string()),
-            liquidity_bnb: t.liquidity_bnb.map(|v| v.to_string()),
-            volume_1h_usd: t.volume_1h_usd.map(|v| v.to_string()),
-            volume_24h_usd: t.volume_24h_usd.map(|v| v.to_string()),
+            price: t.price_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            price_bnb: t.price_bnb.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            price_change1h: t.price_change_1h.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            price_change24h: t.price_change_24h.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            market_cap: t.market_cap_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            liquidity: t.liquidity_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            liquidity_bnb: t.liquidity_bnb.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            volume1h: t.volume_1h_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            volume24h: t.volume_24h_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
 
-            trades_1h: t.trades_1h,
-            trades_24h: t.trades_24h,
-            buys_1h: t.buys_1h,
-            sells_1h: t.sells_1h,
+            trades1h: t.trades_1h.unwrap_or(0),
+            trades24h: t.trades_24h.unwrap_or(0),
+            buys1h: t.buys_1h.unwrap_or(0),
+            sells1h: t.sells_1h.unwrap_or(0),
 
-            holder_count: t.holder_count,
-            top_10_holder_percent: t.top_10_holder_percent.map(|v| v.to_string()),
-            dev_holdings_percent: t.dev_holdings_percent.map(|v| v.to_string()),
-            sniper_ratio: t.sniper_ratio.map(|v| v.to_string()),
+            holders: t.holder_count.unwrap_or(0),
+            top10_holder_percent: t.top_10_holder_percent.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            dev_holdings: t.dev_holdings_percent.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            sniper_ratio: t.sniper_ratio.as_ref().map(bd_to_f64).unwrap_or(0.0),
 
-            lp_locked: t.lp_locked,
-            lp_lock_percent: t.lp_lock_percent.map(|v| v.to_string()),
+            lp_locked: t.lp_locked.unwrap_or(false),
+            lp_lock_percent: t.lp_lock_percent.as_ref().map(bd_to_f64).unwrap_or(0.0),
             lp_unlock_date: t.lp_unlock_date.map(|dt| dt.to_rfc3339()),
-            ownership_renounced: t.ownership_renounced,
+            ownership_renounced: t.ownership_renounced.unwrap_or(false),
 
-            bee_score: t.bee_score,
-            safety_score: t.safety_score,
-            traction_score: t.traction_score,
+            bee_score: t.bee_score.unwrap_or(0),
+            safety_score: t.safety_score.unwrap_or(0),
+            traction_score: t.traction_score.unwrap_or(0),
 
+            chain: "BSC".to_string(),
             last_updated: t.last_updated.map(|dt| dt.to_rfc3339()),
         }
     }
@@ -153,14 +176,15 @@ impl From<Token> for TokenDetail {
 
 /// Swap response item
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SwapItem {
     pub tx_hash: String,
     pub wallet_address: String,
     pub trade_type: String,
-    pub amount_tokens: Option<String>,
-    pub amount_usd: Option<String>,
-    pub price_usd: Option<String>,
-    pub is_whale: Option<bool>,
+    pub amount_tokens: f64,
+    pub amount_usd: f64,
+    pub price_usd: f64,
+    pub is_whale: bool,
     pub timestamp: String,
 }
 
@@ -170,10 +194,10 @@ impl From<Swap> for SwapItem {
             tx_hash: s.tx_hash,
             wallet_address: s.wallet_address,
             trade_type: s.trade_type,
-            amount_tokens: s.amount_tokens.map(|v| v.to_string()),
-            amount_usd: s.amount_usd.map(|v| v.to_string()),
-            price_usd: s.price_usd.map(|v| v.to_string()),
-            is_whale: s.is_whale,
+            amount_tokens: s.amount_tokens.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            amount_usd: s.amount_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            price_usd: s.price_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            is_whale: s.is_whale.unwrap_or(false),
             timestamp: s.timestamp.to_rfc3339(),
         }
     }
@@ -181,42 +205,44 @@ impl From<Swap> for SwapItem {
 
 /// Holder response item
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HolderItem {
     pub wallet_address: String,
-    pub balance: Option<String>,
-    pub percent_of_supply: Option<String>,
-    pub is_dev: Option<bool>,
-    pub is_sniper: Option<bool>,
+    pub balance: f64,
+    pub percent_of_supply: f64,
+    pub is_dev: bool,
+    pub is_sniper: bool,
 }
 
 impl From<TokenHolder> for HolderItem {
     fn from(h: TokenHolder) -> Self {
         Self {
             wallet_address: h.wallet_address,
-            balance: h.balance.map(|v| v.to_string()),
-            percent_of_supply: h.percent_of_supply.map(|v| v.to_string()),
-            is_dev: h.is_dev,
-            is_sniper: h.is_sniper,
+            balance: h.balance.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            percent_of_supply: h.percent_of_supply.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            is_dev: h.is_dev.unwrap_or(false),
+            is_sniper: h.is_sniper.unwrap_or(false),
         }
     }
 }
 
 /// Chart data point
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChartDataPoint {
     pub timestamp: String,
-    pub price_usd: Option<String>,
-    pub liquidity_usd: Option<String>,
-    pub volume_usd: Option<String>,
+    pub price_usd: f64,
+    pub liquidity_usd: f64,
+    pub volume_usd: f64,
 }
 
 impl From<PriceSnapshot> for ChartDataPoint {
     fn from(s: PriceSnapshot) -> Self {
         Self {
             timestamp: s.timestamp.to_rfc3339(),
-            price_usd: s.price_usd.map(|v| v.to_string()),
-            liquidity_usd: s.liquidity_usd.map(|v| v.to_string()),
-            volume_usd: s.volume_usd.map(|v| v.to_string()),
+            price_usd: s.price_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            liquidity_usd: s.liquidity_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
+            volume_usd: s.volume_usd.as_ref().map(bd_to_f64).unwrap_or(0.0),
         }
     }
 }

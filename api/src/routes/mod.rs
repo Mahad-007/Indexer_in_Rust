@@ -21,6 +21,11 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route("/tokens/:address/holders", get(tokens::get_token_holders))
         .route("/tokens/:address/chart", get(tokens::get_token_chart))
         // Wallet routes
+        .route("/wallets", get(wallets::get_wallets).post(wallets::create_wallet))
+        .route(
+            "/wallets/:address",
+            get(wallets::get_wallet).delete(wallets::delete_wallet),
+        )
         .route("/wallets/:address/activity", get(wallets::get_wallet_activity))
         // Alert routes
         .route("/alerts/feed", get(alerts::get_alert_feed))

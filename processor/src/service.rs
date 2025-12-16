@@ -29,6 +29,8 @@ fn create_handler_context(db_pool: Pool<Postgres>) -> HandlerContext {
         .unwrap_or_else(|_| defaults::WHALE_THRESHOLD_USD.to_string())
         .parse::<f64>()
         .unwrap_or(5000.0);
+    let rpc_url = env::var("RPC_URL")
+        .unwrap_or_else(|_| "https://bsc-dataseed.binance.org".to_string());
 
     HandlerContext::new(
         db_pool,
@@ -36,6 +38,7 @@ fn create_handler_context(db_pool: Pool<Postgres>) -> HandlerContext {
         busd_address,
         bnb_price_usd,
         whale_threshold_usd,
+        rpc_url,
     )
 }
 

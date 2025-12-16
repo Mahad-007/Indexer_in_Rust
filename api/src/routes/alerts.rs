@@ -14,36 +14,58 @@ use indexer_db::entity::alert::AlertEvent;
 
 use crate::AppState;
 
-/// Alert feed response item
+/// Helper to convert BigDecimal to f64
+fn bd_to_f64(bd: &sqlx::types::BigDecimal) -> f64 {
+    bd.to_string().parse().unwrap_or(0.0)
+}
+
+/// Map backend alert types to frontend types
+fn map_alert_type(alert_type: &str) -> &str {
+    match alert_type {
+        "new_token" => "token_signal",
+        "whale_buy" | "whale_sell" => "wallet_activity",
+        "price_pump" | "price_dump" => "token_signal",
+        "lp_locked" | "lp_unlocking" => "token_signal",
+        "high_bee_score" => "token_signal",
+        "dev_sell" => "wallet_activity",
+        "filter_match" => "filter_match",
+        _ => "token_signal",
+    }
+}
+
+/// Alert feed response item - matches frontend Alert interface
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AlertItem {
-    pub id: i32,
+    pub id: String,
+    #[serde(rename = "type")]
     pub alert_type: String,
-    pub token_address: Option<String>,
-    pub token_symbol: Option<String>,
-    pub wallet_address: Option<String>,
     pub title: String,
-    pub message: Option<String>,
+    pub message: String,
+    pub token_address: Option<String>,
+    pub wallet_address: Option<String>,
+    pub timestamp: String,
+    pub is_read: bool,
+    // Additional fields for enrichment
     pub bee_score: Option<i16>,
-    pub amount_usd: Option<String>,
-    pub change_percent: Option<String>,
-    pub created_at: Option<String>,
+    pub amount_usd: Option<f64>,
+    pub change_percent: Option<f64>,
 }
 
 impl From<AlertEvent> for AlertItem {
     fn from(a: AlertEvent) -> Self {
         Self {
-            id: a.id,
-            alert_type: a.alert_type,
-            token_address: a.token_address,
-            token_symbol: a.token_symbol,
-            wallet_address: a.wallet_address,
+            id: a.id.to_string(),
+            alert_type: map_alert_type(&a.alert_type).to_string(),
             title: a.title,
-            message: a.message,
+            message: a.message.unwrap_or_default(),
+            token_address: a.token_address,
+            wallet_address: a.wallet_address,
+            timestamp: a.created_at.map(|dt| dt.to_rfc3339()).unwrap_or_default(),
+            is_read: false, // Default to unread - frontend manages read state locally
             bee_score: a.bee_score,
-            amount_usd: a.amount_usd.map(|v| v.to_string()),
-            change_percent: a.change_percent.map(|v| v.to_string()),
-            created_at: a.created_at.map(|dt| dt.to_rfc3339()),
+            amount_usd: a.amount_usd.as_ref().map(bd_to_f64),
+            change_percent: a.change_percent.as_ref().map(bd_to_f64),
         }
     }
 }

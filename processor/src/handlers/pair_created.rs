@@ -3,6 +3,7 @@
 //! Handles new token pair creation from PancakeSwap Factory.
 //! - Identifies which token is the new memecoin (vs WBNB/BUSD)
 //! - Creates token and pair records in database
+//! - Fetches token metadata (name, symbol, decimals) from blockchain
 //! - Creates alert for new token launch
 
 use sqlx::types::BigDecimal;
@@ -22,8 +23,9 @@ use super::{HandlerContext, HandlerResult};
 ///
 /// 1. Determine which token is the new memecoin (not WBNB/BUSD)
 /// 2. Create a new pair record
-/// 3. Create a new token record (or update if exists)
-/// 4. Create an alert for the new token launch
+/// 3. Fetch token metadata from blockchain
+/// 4. Create a new token record (or update if exists)
+/// 5. Create an alert for the new token launch
 pub async fn handle(ctx: &HandlerContext, event: &PairCreatedEvent) -> HandlerResult<()> {
     println!(
         "Processing PairCreated: pair={}, token0={}, token1={}",
@@ -66,13 +68,20 @@ pub async fn handle(ctx: &HandlerContext, event: &PairCreatedEvent) -> HandlerRe
         }
     }
 
-    // Create or update the token record
+    // Fetch token metadata from blockchain
+    println!("Fetching metadata for token: {}", new_token);
+    let metadata = ctx.fetch_token_metadata(new_token).await;
+
+    // Parse total supply as BigDecimal if available
+    let total_supply = metadata.total_supply.as_ref().and_then(|s| BigDecimal::from_str(s).ok());
+
+    // Create or update the token record with metadata
     let new_token_record = NewToken {
         address: new_token.clone(),
-        name: None, // Will be fetched via RPC later
-        symbol: None,
-        decimals: Some(18), // Default, will be updated
-        total_supply: None,
+        name: metadata.name.clone(),
+        symbol: metadata.symbol.clone(),
+        decimals: metadata.decimals.or(Some(18)),
+        total_supply,
         pair_address: Some(event.pair.clone()),
         creator_address: None, // Would need to trace transaction to get creator
         block_number: Some(block_number),
@@ -81,23 +90,27 @@ pub async fn handle(ctx: &HandlerContext, event: &PairCreatedEvent) -> HandlerRe
     match Token::create(&new_token_record, &ctx.db_pool).await {
         Ok(token) => {
             println!(
-                "Created token: {} (id={}, pair={})",
-                token.address, token.id, event.pair
+                "Created token: {} - {} ({}) (id={}, pair={})",
+                token.address,
+                token.name.as_deref().unwrap_or("Unknown"),
+                token.symbol.as_deref().unwrap_or("???"),
+                token.id,
+                event.pair
             );
 
             // Create alert for new token
+            let token_name = token.name.as_deref().unwrap_or("Unknown Token");
+            let token_symbol = token.symbol.as_deref().unwrap_or(&token.address[..10]);
+            
             let alert = NewAlert {
                 alert_type: AlertType::NewToken.as_str().to_string(),
                 token_address: Some(token.address.clone()),
                 token_symbol: token.symbol.clone(),
                 wallet_address: None,
-                title: format!(
-                    "New Token: {}",
-                    token.symbol.as_deref().unwrap_or(&token.address[..10])
-                ),
+                title: format!("New Token: {} ({})", token_name, token_symbol),
                 message: Some(format!(
-                    "New token {} created on PancakeSwap at block {}",
-                    token.address, block_number
+                    "New token {} ({}) created on PancakeSwap at block {}",
+                    token_name, token_symbol, block_number
                 )),
                 bee_score: None,
                 amount_usd: None,
@@ -115,8 +128,8 @@ pub async fn handle(ctx: &HandlerContext, event: &PairCreatedEvent) -> HandlerRe
     }
 
     println!(
-        "Processed PairCreated: new_token={}, base={}, pair={}",
-        new_token, base_token, event.pair
+        "Processed PairCreated: new_token={} ({:?}), base={}, pair={}",
+        new_token, metadata.symbol, base_token, event.pair
     );
 
     Ok(())

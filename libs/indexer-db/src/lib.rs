@@ -10,7 +10,7 @@ pub mod entity;
 // Re-export commonly used types
 pub use entity::{
     AlertEvent, EvmChains, EvmLogs, EvmSyncLogs, LpLock, Pair, PriceSnapshot, Swap, Token,
-    TokenHolder, WalletActivity,
+    TokenHolder, Wallet, WalletActivity, WalletWithStats,
 };
 
 mod defaults {
